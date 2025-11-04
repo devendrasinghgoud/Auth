@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Phone number is required"],
       unique: true,
-      match: [/^\+?[1-9]\d{9,14}$/, "Please enter a valid phone number"],
+      match: [/^[0-9]{10}$/, "Please enter a valid phone number"],
     },
     password: {
       type: String,
@@ -48,6 +48,15 @@ const userSchema = new mongoose.Schema(
     isVerified: {
       type: Boolean,
       default: false,
+    },
+
+    otp: {
+      type: String,
+      default: null,
+    },
+    otpExpires: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }

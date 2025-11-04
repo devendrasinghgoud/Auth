@@ -1,10 +1,16 @@
 import Joi from "joi";
 
 export const registerValidation = Joi.object({
-  name: Joi.string().min(3).max(50).required().messages({
-    "string.empty": "Name is required",
-    "string.min": "Name must be at least 3 characters",
-    "string.max": "Name cannot exceed 50 characters",
+  firstName: Joi.string().min(2).max(50).required().messages({
+    "string.empty": "First name is required",
+    "string.min": "First name must be at least 2 characters",
+    "string.max": "First name cannot exceed 50 characters",
+  }),
+
+  lastName: Joi.string().min(2).max(50).required().messages({
+    "string.empty": "Last name is required",
+    "string.min": "Last name must be at least 2 characters",
+    "string.max": "Last name cannot exceed 50 characters",
   }),
 
   username: Joi.string()

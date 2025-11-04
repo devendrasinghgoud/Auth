@@ -1,4 +1,3 @@
-// modules/auth/authController.js
 import {
   registerUserService,
   verifyOtpService,
@@ -6,6 +5,7 @@ import {
   forgotPasswordService,
   resetPasswordService,
   getProfileService,
+  resendOtpService,
 } from "./authService.js";
 
 export const registerUser = async (req, res) => {
@@ -16,7 +16,6 @@ export const registerUser = async (req, res) => {
       message: "User registered successfully. Please verify your email.",
     });
   } catch (err) {
-    console.error("Register Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -31,7 +30,18 @@ export const verifyOtp = async (req, res) => {
       user,
     });
   } catch (err) {
-    console.error("Verify OTP Error:", err);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const resendOtp = async (req, res) => {
+  try {
+    await resendOtpService(req.body.email);
+    res.json({
+      success: true,
+      message: "A new OTP has been sent to your email.",
+    });
+  } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -44,7 +54,8 @@ export const loginUser = async (req, res) => {
       message: "Login successful",
       user: {
         id: user._id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         username: user.username,
         email: user.email,
         phone: user.phone,
@@ -52,7 +63,6 @@ export const loginUser = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Login Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -65,7 +75,6 @@ export const forgotPassword = async (req, res) => {
       message: "Password reset OTP sent to your email.",
     });
   } catch (err) {
-    console.error("Forgot Password Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -78,7 +87,6 @@ export const resetPassword = async (req, res) => {
       message: "Password reset successful.",
     });
   } catch (err) {
-    console.error("Reset Password Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -88,7 +96,6 @@ export const getProfile = async (req, res) => {
     const user = await getProfileService(req.user.id);
     res.json({ success: true, user });
   } catch (err) {
-    console.error("Get Profile Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -98,7 +105,6 @@ export const logoutUser = async (req, res) => {
     res.clearCookie("token");
     res.json({ success: true, message: "Logged out successfully" });
   } catch (err) {
-    console.error("Logout Error:", err);
     res.status(500).json({ success: false, message: "Logout failed" });
   }
 };
