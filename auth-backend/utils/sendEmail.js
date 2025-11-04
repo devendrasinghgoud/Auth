@@ -10,17 +10,17 @@ const sendEmail = async (to, subject, text) => {
       },
     });
 
-    const mailOptions = {
-      from: `"Auth App" <${process.env.EMAIL_USER}>`,
+    await transporter.sendMail({
+      from: `"Auth System" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text,
-    };
+    });
 
-    await transporter.sendMail(mailOptions);
     console.log(` Email sent to ${to}`);
-  } catch (error) {
-    console.error(" Email sending error:", error);
+  } catch (err) {
+    console.error("EMAIL ERROR:", err.message);
+    throw new Error("Failed to send email");
   }
 };
 
