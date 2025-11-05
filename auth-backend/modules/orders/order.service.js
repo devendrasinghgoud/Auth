@@ -1,72 +1,98 @@
+import Product from "../../models/Product.js";
 import Order from "../../models/Order.js";
-import nodemailer from "nodemailer";
+import { sendEmail } from "../../utils/sendEmail.js";
+import User from "../../models/User.js";
 
 export const createOrderService = async (user, items) => {
-  if (!items || !items.length) {
-    throw new Error("Order must contain at least one item.");
+  if (!user || !user.id) throw new Error("User information missing in request");
+
+  const orderItems = [];
+  const productIds = items.map((item) => item.product);
+  const products = await Product.find({ _id: { $in: productIds } });
+
+  for (const item of items) {
+    let product = products.find((p) => p._id.toString() === item.product);
+    if (!product) product = await Product.findOne({ name: item.name });
+    if (!product) throw new Error(`Product not found: ${item.product || item.name}`);
+
+    try {
+      product.checkAvailability(item.quantity);
+    } catch (err) {
+      throw new Error(err.message);
+    }
+
+    product.stock -= item.quantity;
+    await product.save();
+
+    orderItems.push({
+      product: product._id,
+      name: product.name,
+      price: product.price,
+      quantity: item.quantity,
+    });
   }
 
-  if (!user || !user._id) {
-    throw new Error("User not authenticated. Please log in.");
+  const order = await Order.create({ userId: user.id, items: orderItems });
+
+  // Send order confirmation email
+  const userData = await User.findById(user.id);
+  if (userData?.email) {
+    const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const html = `
+      <h2>Order Confirmation</h2>
+      <p>Hi ${userData.firstName || "Customer"},</p>
+      <p>Your order has been placed successfully!</p>
+      <h3>Order Details:</h3>
+      <ul>
+        ${orderItems
+          .map(
+            (item) =>
+              `<li>${item.name} - ${item.quantity} × ₹${item.price} = ₹${
+                item.price * item.quantity
+              }</li>`
+          )
+          .join("")}
+      </ul>
+      <p><strong>Total:</strong> ₹${total}</p>
+      <p>Status: ${order.status}</p>
+      <p>Thank you for shopping with us!</p>
+    `;
+    await sendEmail(userData.email, "Order Confirmation", html);
   }
-
-  const totalAmount = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
-
-  const order = await Order.create({
-    userId: user._id,
-    items,
-    totalAmount,
-    status: "Pending",
-  });
-
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error("Email service not configured properly.");
-  }
-
-  const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  const orderItemsHTML = items
-    .map(
-      (item) =>
-        `<li>${item.name} (x${item.quantity}) — ₹${item.price * item.quantity}</li>`
-    )
-    .join("");
-
-  const mailOptions = {
-    from: `"Shop Support" <${process.env.EMAIL_USER}>`,
-    to: user.email,
-    subject: "Order Confirmation — Your Order Has Been Placed!",
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>Hi ${user.firstName || "Customer"},</h2>
-        <p>Thank you for your order!</p>
-        <p>Your order has been placed successfully and is now being processed.</p>
-        <hr />
-        <p><strong>Order Summary:</strong></p>
-        <ul>${orderItemsHTML}</ul>
-        <p><strong>Total Amount:</strong> ₹${totalAmount}</p>
-        <p><strong>Status:</strong> ${order.status}</p>
-        <hr />
-        <p>We’ll notify you once your order is shipped!</p>
-        <p>— The Support Team</p>
-      </div>
-    `,
-  };
-
-  await transporter.sendMail(mailOptions);
 
   return order;
 };
 
-export const getAllOrdersService = async () => {
-  return await Order.find().populate("userId", "firstName lastName email");
+export const getAllOrdersService = async (query) => {
+  const { page = 1, limit = 10, search = "", sort = "newest" } = query;
+
+  const userFilter = search
+    ? {
+        $or: [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ],
+      }
+    : {};
+
+  const matchedUsers = await User.find(userFilter).select("_id");
+  const userIds = matchedUsers.map((u) => u._id);
+  const orderFilter = userIds.length ? { userId: { $in: userIds } } : {};
+  const sortOrder = sort === "oldest" ? 1 : -1;
+  const totalOrders = await Order.countDocuments(orderFilter);
+
+  const orders = await Order.find(orderFilter)
+    .populate("userId", "firstName lastName email")
+    .populate("items.product", "name price stock isActive unavailableReason")
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .sort({ createdAt: sortOrder });
+
+  return {
+    orders,
+    totalOrders,
+    totalPages: Math.ceil(totalOrders / limit),
+    currentPage: Number(page),
+  };
 };

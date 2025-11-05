@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Admin from "../models/Admin.js";
 
-
 export const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -15,13 +14,14 @@ export const protect = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "supersecretkey"
+    );
 
-    let user;
+    let user = await Admin.findById(decoded.id).select("-password -otp -otpExpires");
 
-    if (decoded.role === "admin") {
-      user = await Admin.findById(decoded.id).select("-password -otp -otpExpires");
-    } else {
+    if (!user) {
       user = await User.findById(decoded.id).select("-password -otp -otpExpires");
     }
 
@@ -46,14 +46,22 @@ export const protect = async (req, res, next) => {
   }
 };
 
-export const authorize = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+export const adminOnly = async (req, res, next) => {
+  try {
+    // Check if the current authenticated user is in the Admin collection
+    const admin = await Admin.findById(req.user._id);
+    if (!admin) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: You do not have permission to access this resource",
+        message: "Access denied. Admins only.",
       });
     }
     next();
-  };
+  } catch (err) {
+    console.error("ADMIN AUTH ERROR:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Authorization error",
+    });
+  }
 };

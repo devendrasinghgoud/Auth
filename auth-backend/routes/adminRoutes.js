@@ -16,12 +16,36 @@ router.post("/login", loginAdmin);
 router.get("/users", protect, isAdmin, getAllUsers);
 router.delete("/users/:id", protect, isAdmin, deleteUser);
 
-router.get("/all", protect, isAdmin, async (req, res) => {
+router.get("/admins", protect, isAdmin, async (req, res) => {
   try {
-    const admins = await Admin.find().select("-password");
-    res.json({ success: true, admins });
+    const { page = 1, limit = 10, search = "" } = req.query;
+    const filter = search
+      ? {
+          $or: [
+            { firstName: { $regex: search, $options: "i" } },
+            { lastName: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+          ],
+        }
+      : {};
+    const totalAdmins = await Admin.countDocuments(filter);
+    const admins = await Admin.find(filter)
+      .select("-password")
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      page: Number(page),
+      totalPages: Math.ceil(totalAdmins / limit),
+      totalAdmins,
+      admins,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching admins",
+    });
   }
 });
 

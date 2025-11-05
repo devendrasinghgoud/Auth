@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import User from "../../models/User.js";
 import { generateOtp } from "../../utils/generateOtp.js";
-import sendEmail from "../../utils/sendEmail.js";
+import { sendEmail } from "../../utils/sendEmail.js";
 
 export const getAllUsers = async () => {
   return await User.find().select("-password -otp -otpExpires");

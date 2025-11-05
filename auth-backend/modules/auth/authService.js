@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import User from "../../models/User.js";
-import sendEmail from "../../utils/sendEmail.js";
+import { sendEmail } from "../../utils/sendEmail.js";
 import { generateToken } from "../../utils/generateToken.js";
 import { generateOtp } from "../../utils/generateOtp.js";
 
@@ -56,7 +56,6 @@ export const registerUserService = async ({
   };
 };
 
-
 export const verifyOtpService = async ({ email, otp }) => {
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) throw new Error("User not found");
@@ -75,7 +74,14 @@ export const verifyOtpService = async ({ email, otp }) => {
     success: true,
     message: "Email verified successfully",
     token,
-    user,
+    user: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+    },
   };
 };
 
@@ -83,16 +89,14 @@ export const resendOtpService = async (email) => {
   if (!email) throw new Error("Email is required");
 
   const normalizedEmail = email.toLowerCase().trim();
-
   const user = await User.findOne({ email: normalizedEmail });
+
   if (!user) throw new Error("User not found");
   if (user.isVerified) throw new Error("User already verified");
 
   const { otp, otpExpires } = generateOtp();
-
   user.otp = otp;
   user.otpExpires = otpExpires;
-
   await user.save();
 
   await sendEmail(
@@ -109,10 +113,7 @@ export const resendOtpService = async (email) => {
 
 export const loginUserService = async ({ identifier, password }) => {
   const user = await User.findOne({
-    $or: [
-      { email: identifier.toLowerCase() },
-      { username: identifier },
-    ],
+    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
   });
 
   if (!user) throw new Error("User not found");
@@ -122,11 +123,19 @@ export const loginUserService = async ({ identifier, password }) => {
   if (!isMatch) throw new Error("Invalid credentials");
 
   const token = generateToken(user);
+
   return {
     success: true,
     message: "Login successful",
     token,
-    user,
+    user: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+    },
   };
 };
 

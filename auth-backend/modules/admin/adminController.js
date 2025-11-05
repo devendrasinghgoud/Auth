@@ -17,7 +17,6 @@ export const registerAdmin = async (req, res) => {
         lastName: admin.lastName,
         email: admin.email,
         phone: admin.phone,
-        role: admin.role,
       },
     });
   } catch (error) {
@@ -37,7 +36,6 @@ export const loginAdmin = async (req, res) => {
         lastName: admin.lastName,
         email: admin.email,
         phone: admin.phone,
-        role: admin.role,
         token,
       },
     });
@@ -48,10 +46,20 @@ export const loginAdmin = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await getAllUsersService();
-    res.status(200).json({ success: true, users });
+    const { users, totalUsers, totalPages, currentPage } = await getAllUsersService(req.query);
+    res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      users,
+      count: totalUsers,
+      totalPages,
+      currentPage,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

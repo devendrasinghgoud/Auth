@@ -1,27 +1,24 @@
 import nodemailer from "nodemailer";
 
-const sendEmail = async (to, subject, text) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"Auth System" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text,
-    });
-
-    console.log(` Email sent to ${to}`);
-  } catch (err) {
-    console.error("EMAIL ERROR:", err.message);
-    throw new Error("Failed to send email");
+export const sendEmail = async (to, subject, html) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error("Email service not configured properly.");
   }
-};
 
-export default sendEmail;
+  const transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: `"Shop Support" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
