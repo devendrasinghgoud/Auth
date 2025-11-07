@@ -1,4 +1,4 @@
-import fs from "fs";
+import cloudinary from "../../config/cloudinary.js";
 import Image from "../../models/imageModel.js";
 import Product from "../../models/Product.js";
 
@@ -6,51 +6,69 @@ export const uploadImagesService = async (user, productId, files) => {
   const product = await Product.findById(productId);
   if (!product) throw new Error("Product not found");
 
-  if (!files || files.length === 0) throw new Error("No files uploaded");
+  const savedImageIds = [];
 
-  const imageDocs = await Promise.all(
-    files.map(async (file) => {
-      const image = await Image.create({
-        filename: file.filename,
-        path: file.path,
-        product: productId,
-        uploadedBy: user._id,
-      });
-      return image._id;
-    })
-  );
+  for (const file of files) {
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: "ecommerce_products",
+    });
 
-  product.images.push(...imageDocs);
+    const image = await Image.create({
+      filename: file.originalname,
+      url: result.secure_url,
+      public_id: result.public_id,
+      product: product._id,
+      uploadedBy: user?._id || null,
+    });
+
+    savedImageIds.push(image._id);
+    product.images.push(image._id);
+  }
+
   await product.save();
 
-  return imageDocs;
+  return savedImageIds;
 };
 
 export const deleteImageService = async (imageId) => {
   const image = await Image.findById(imageId);
   if (!image) throw new Error("Image not found");
 
-  if (fs.existsSync(image.path)) fs.unlinkSync(image.path);
+  // Remove from Cloudinary
+  if (image.public_id) {
+    await cloudinary.uploader.destroy(image.public_id);
+  }
 
-  await Product.findByIdAndUpdate(image.product, {
-    $pull: { images: imageId },
-  });
+  // Remove image reference from product
+  if (image.product) {
+    await Product.findByIdAndUpdate(image.product, {
+      $pull: { images: image._id },
+    });
+  }
 
   await image.deleteOne();
 
-  return true;
+  return { success: true };
 };
 
 export const updateImageService = async (imageId, file) => {
   const image = await Image.findById(imageId);
   if (!image) throw new Error("Image not found");
-  if (!file) throw new Error("No new image uploaded");
 
-  if (fs.existsSync(image.path)) fs.unlinkSync(image.path);
+  // Delete old image from Cloudinary
+  if (image.public_id) {
+    await cloudinary.uploader.destroy(image.public_id);
+  }
 
-  image.filename = file.filename;
-  image.path = file.path;
+  // Upload new image
+  const result = await cloudinary.uploader.upload(file.path, {
+    folder: "ecommerce_products",
+  });
+
+  image.filename = file.originalname;
+  image.url = result.secure_url;
+  image.public_id = result.public_id;
+
   await image.save();
-
   return image;
 };

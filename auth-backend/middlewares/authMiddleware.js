@@ -14,13 +14,12 @@ export const protect = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "supersecretkey"
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
 
+    // Try to find admin first
     let user = await Admin.findById(decoded.id).select("-password -otp -otpExpires");
 
+    // If not admin, check regular user
     if (!user) {
       user = await User.findById(decoded.id).select("-password -otp -otpExpires");
     }
@@ -32,7 +31,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    req.user = user; // attach the user or admin to the request
     next();
   } catch (err) {
     console.error("AUTH ERROR:", err.message);
@@ -48,7 +47,7 @@ export const protect = async (req, res, next) => {
 
 export const adminOnly = async (req, res, next) => {
   try {
-    // Check if the current authenticated user is in the Admin collection
+    // Ensure the authenticated user is an admin
     const admin = await Admin.findById(req.user._id);
     if (!admin) {
       return res.status(403).json({

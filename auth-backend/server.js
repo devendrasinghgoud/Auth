@@ -10,6 +10,9 @@ import adminRoutes from "./routes/adminRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import imageRoutes from "./routes/imageRoutes.js";
 import orderRoutes from "./routes/order.routes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import cartRoutes from "./routes/cartRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -30,9 +33,17 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/images", imageRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/payment", paymentRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/admin/categories", categoryRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
+
+const PORT = 5000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});

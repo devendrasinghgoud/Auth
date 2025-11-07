@@ -6,19 +6,26 @@ import {
   deleteProductService,
 } from "./product.service.js";
 
-/**
- * Create a new product
- */
+// -----------------
+// Create Product
+// -----------------
 export const createProduct = async (req, res) => {
   try {
-    const product = await createProductService(req.user, req.body, req.files);
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one product image is required.",
+      });
+    }
+
+    const result = await createProductService(req.user, req.body, req.files);
+
     res.status(201).json({
       success: true,
-      message: "Product created successfully",
-      product,
+      message: result.message,
+      product: result.result,
     });
   } catch (error) {
-    console.error("Product creation failed:", error);
     res.status(400).json({
       success: false,
       message: error.message || "Failed to create product",
@@ -26,19 +33,14 @@ export const createProduct = async (req, res) => {
   }
 };
 
-/**
- * Get all products with pagination, search, and sorting
- */
+// -----------------
+// Get All Products
+// -----------------
 export const getAllProducts = async (req, res) => {
   try {
     const data = await getAllProductsService(req.query);
-    res.status(200).json({
-      success: true,
-      message: "Products fetched successfully",
-      ...data,
-    });
+    res.status(200).json(data);
   } catch (error) {
-    console.error("Fetch all products failed:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to retrieve products",
@@ -46,18 +48,14 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-/**
- * Get a single product by ID
- */
+// -----------------
+// Get Product by ID
+// -----------------
 export const getProductById = async (req, res) => {
   try {
-    const product = await getProductByIdService(req.params.id);
-    res.status(200).json({
-      success: true,
-      product,
-    });
+    const result = await getProductByIdService(req.params.id);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Fetch product by ID failed:", error);
     const status = error.name === "CastError" ? 400 : 404;
     res.status(status).json({
       success: false,
@@ -69,25 +67,19 @@ export const getProductById = async (req, res) => {
   }
 };
 
-/**
- * Update a product
- */
+// -----------------
+// Update Product
+// -----------------
 export const updateProduct = async (req, res) => {
   try {
-    const product = await updateProductService(
-      req.params.id,
-      req.body,
-      req.files,
-      req.user
-    );
+    const result = await updateProductService(req.params.id, req.body, req.files);
     res.status(200).json({
       success: true,
-      message: "Product updated successfully",
-      product,
+      message: result.message,
+      product: result.result,
     });
   } catch (error) {
-    console.error("Product update failed:", error);
-    const status = error.name === "CastError" ? 400 : 400;
+    const status = error.name === "CastError" ? 400 : 404;
     res.status(status).json({
       success: false,
       message: error.message || "Failed to update product",
@@ -95,18 +87,14 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-/**
- * Delete a product along with its images
- */
+// -----------------
+// Delete Product
+// -----------------
 export const deleteProduct = async (req, res) => {
   try {
-    await deleteProductService(req.params.id);
-    res.status(200).json({
-      success: true,
-      message: "Product and its images deleted successfully",
-    });
+    const result = await deleteProductService(req.params.id);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Product deletion failed:", error);
     const status = error.name === "CastError" ? 400 : 404;
     res.status(status).json({
       success: false,

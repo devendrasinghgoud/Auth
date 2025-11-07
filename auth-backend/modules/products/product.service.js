@@ -2,145 +2,219 @@ import Product from "../../models/Product.js";
 import Image from "../../models/imageModel.js";
 import cloudinary from "../../config/cloudinary.js";
 
-
 export const createProductService = async (user, data, files) => {
-  const { name, description, price, category, stock } = data;
+  const {
+    title,
+    description,
+    original_price,
+    discountPercentage,
+    rating,
+    stockQuantity,
+    brand,
+    category,
+    trending,
+  } = data;
 
-  if (!name || !description || !price || !category) {
+  if (!title || !description || !original_price || !category || !brand) {
     throw new Error(
-      "All required fields (name, description, price, category) must be filled."
+      "All required fields (title, description, original_price, category, brand) must be filled."
     );
   }
+
+  // Upload product images (if any)
+  const imageIds = [];
+  if (files?.length) {
+    for (const file of files) {
+      const upload = await cloudinary.uploader.upload(file.path, {
+        folder: "ecommerce_products",
+      });
+
+      const imgDoc = await Image.create({
+        filename: file.originalname,
+        url: upload.secure_url,
+        public_id: upload.public_id,
+        uploadedBy: user?._id || null,
+      });
+
+      imageIds.push(imgDoc._id);
+    }
+  }
+
+  // Compute discount and price
+  const discount = Number(discountPercentage) || 0;
+  const discountedPrice =
+    original_price - (original_price * discount) / 100;
+  const quantity = Number(stockQuantity) || 0;
 
   const product = await Product.create({
-    name: name.trim(),
+    title: title.trim(),
     description: description.trim(),
-    price,
-    category: category.trim(),
-    stock: stock || 0,
-    createdBy: user._id,
+    original_price,
+    discountPercentage: discount,
+    price: discountedPrice,
+    rating: rating || 0,
+    stockQuantity: quantity,
+    inStock: quantity > 0,
+    brand: brand.trim(),
+    category, //  now stores ObjectId of category
+    images: imageIds,
+    trending: trending ?? false,
+    createdBy: user?._id || null,
   });
 
-  if (files?.length) {
-    const imageIds = await Promise.all(
-      files.map(async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ecommerce_products",
-        });
-        const image = await Image.create({
-          filename: file.originalname,
-          url: result.secure_url,
-          public_id: result.public_id,
-          product: product._id,
-          uploadedBy: user._id,
-        });
-        return image._id;
-      })
-    );
-    product.images = imageIds;
-    await product.save();
-  }
-
-  return await product.populate("images");
+  return {
+    success: true,
+    message: "Product created successfully",
+    result: product,
+  };
 };
-
 
 export const getAllProductsService = async (query = {}) => {
   const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
+  const limit = Number(query.limit) || 8;
   const search = query.search?.trim() || "";
   const sortOrder = query.sort === "oldest" ? 1 : -1;
 
   const filter = search
     ? {
         $or: [
-          { name: { $regex: search, $options: "i" } },
+          { title: { $regex: search, $options: "i" } },
           { description: { $regex: search, $options: "i" } },
-          { category: { $regex: search, $options: "i" } },
+          { brand: { $regex: search, $options: "i" } },
         ],
       }
     : {};
 
-  const totalProducts = await Product.countDocuments(filter);
+  const total = await Product.countDocuments(filter);
 
-  const products = await Product.find(filter)
-    .populate("createdBy", "firstName lastName email")
-    .populate("images", "url filename")
+  const results = await Product.find(filter)
+    .populate("category", "category _id")
+    .populate("images", "url public_id")
+    .populate("createdBy", "name email")
     .sort({ createdAt: sortOrder })
     .skip((page - 1) * limit)
-    .limit(limit);
+    .limit(limit)
+    .lean();
 
   return {
     success: true,
     message: "Products fetched successfully",
-    products,
-    count: products.length,
-    totalProducts,
-    totalPages: Math.ceil(totalProducts / limit),
-    currentPage: page,
+    results,
+    
+      count: results.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      limit,
+    
   };
 };
 
-
 export const getProductByIdService = async (id) => {
   const product = await Product.findById(id)
-    .populate("createdBy", "firstName lastName email")
-    .populate("images", "url filename public_id");
+    .populate("category", "category _id")
+    .populate("images", "url public_id")
+    .populate("createdBy", "name email");
 
   if (!product) throw new Error("Product not found");
-  return product;
+
+  return {
+    success: true,
+    message: "Product fetched successfully",
+    result: product,
+  };
 };
 
-
-export const updateProductService = async (id, data, files, user) => {
+export const updateProductService = async (id, data, files) => {
   const product = await Product.findById(id);
   if (!product) throw new Error("Product not found");
 
-  Object.assign(product, data);
+  const updatableFields = [
+    "title",
+    "description",
+    "original_price",
+    "discountPercentage",
+    "rating",
+    "stockQuantity",
+    "brand",
+    "category",
+    "trending",
+  ];
 
-  if (typeof data.stock !== "undefined") {
-    product.stock = Number(data.stock);
+  for (const field of updatableFields) {
+    if (data[field] !== undefined) product[field] = data[field];
   }
 
-  if (files?.length) {
-    const newImageIds = await Promise.all(
-      files.map(async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, {
-          folder: "ecommerce_products",
-        });
-        const image = await Image.create({
-          filename: file.originalname,
-          url: result.secure_url,
-          public_id: result.public_id,
-          product: product._id,
-          uploadedBy: user._id,
-        });
-        return image._id;
-      })
-    );
+  // Recalculate price and stock
+  const discount = Number(product.discountPercentage) || 0;
+  product.price =
+    product.original_price - (product.original_price * discount) / 100;
+  product.inStock = (product.stockQuantity || 0) > 0;
 
-    product.images.push(...newImageIds);
+  // Handle new image uploads
+  if (files?.length) {
+    // Delete old images
+    if (product.images?.length) {
+      for (const imgId of product.images) {
+        const imgDoc = await Image.findById(imgId);
+        if (imgDoc) {
+          await cloudinary.uploader.destroy(imgDoc.public_id);
+          await imgDoc.deleteOne();
+        }
+      }
+    }
+
+    // Upload new images
+    const newImageIds = [];
+    for (const file of files) {
+      const upload = await cloudinary.uploader.upload(file.path, {
+        folder: "ecommerce_products",
+      });
+
+      const imgDoc = await Image.create({
+        filename: file.originalname,
+        url: upload.secure_url,
+        public_id: upload.public_id,
+        uploadedBy: product.createdBy || null,
+      });
+
+      newImageIds.push(imgDoc._id);
+    }
+
+    product.images = newImageIds;
   }
 
   await product.save();
-  return await product.populate("images");
+
+  return {
+    success: true,
+    message: "Product updated successfully",
+    result: product,
+  };
 };
 
-
+// -----------------
+// Delete Product
+// -----------------
 export const deleteProductService = async (id) => {
-  const product = await Product.findById(id).populate("images");
+  const product = await Product.findById(id);
   if (!product) throw new Error("Product not found");
 
-  // Delete images from Cloudinary and DB
+  // Delete product images from Cloudinary + DB
   if (product.images?.length) {
-    for (const img of product.images) {
-      if (img.public_id) {
-        await cloudinary.uploader.destroy(img.public_id);
+    for (const imgId of product.images) {
+      const imgDoc = await Image.findById(imgId);
+      if (imgDoc) {
+        await cloudinary.uploader.destroy(imgDoc.public_id);
+        await imgDoc.deleteOne();
       }
-      await Image.findByIdAndDelete(img._id);
     }
   }
 
   await product.deleteOne();
-  return { success: true, message: "Product and its images deleted successfully" };
+
+  return {
+    success: true,
+    message: "Product and its images deleted successfully",
+  };
 };
