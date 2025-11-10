@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Admin from "../../models/Admin.js";
 import User from "../../models/User.js";
+import Product from "../../models/Product.js";
+import Order from "../../models/Order.js";
 
 const generateToken = (admin) => {
   return jwt.sign(
@@ -79,5 +81,79 @@ export const getAllUsersService = async (query) => {
 export const deleteUserService = async (id) => {
   const user = await User.findByIdAndDelete(id);
   if (!user) throw new Error("User not found");
+  
+  await Order.deleteMany({ userId: id });
+  return true;
+};
+
+export const getAllProductsService = async (query) => {
+  const { page = 1, limit = 10, search = "", sort = "newest" } = query;
+
+  const filter = search
+    ? {
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      }
+    : {};
+
+  const sortOrder = sort === "oldest" ? 1 : -1;
+
+  const totalProducts = await Product.countDocuments(filter);
+  const products = await Product.find(filter)
+    .populate("category")
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .sort({ createdAt: sortOrder });
+
+  return {
+    products,
+    totalProducts,
+    totalPages: Math.ceil(totalProducts / limit),
+    currentPage: Number(page),
+  };
+};
+
+export const deleteProductService = async (id) => {
+  const product = await Product.findByIdAndDelete(id);
+  if (!product) throw new Error("Product not found");
+  return true;
+};
+
+export const getAllOrdersService = async (query) => {
+  const { page = 1, limit = 10, sort = "newest" } = query;
+
+  const sortOrder = sort === "oldest" ? 1 : -1;
+
+  const totalOrders = await Order.countDocuments({});
+  const orders = await Order.find({})
+    .populate("userId", "firstName lastName email") 
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .sort({ createdAt: sortOrder });
+
+  return {
+    orders,
+    totalOrders,
+    totalPages: Math.ceil(totalOrders / limit),
+    currentPage: Number(page),
+  };
+};
+
+export const getOrdersByUserIdService = async (userId) => {
+  const orders = await Order.find({ userId: userId })
+    .populate("userId", "firstName lastName email")
+    .sort({ createdAt: -1 });
+
+  if (!orders || orders.length === 0) {
+    throw new Error("No orders found for this user");
+  }
+  return orders;
+};
+
+export const deleteOrderService = async (id) => {
+  const order = await Order.findByIdAndDelete(id);
+  if (!order) throw new Error("Order not found");
   return true;
 };

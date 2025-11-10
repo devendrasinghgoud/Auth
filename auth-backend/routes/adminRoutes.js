@@ -4,6 +4,11 @@ import {
   loginAdmin,
   getAllUsers,
   deleteUser,
+  getAllProducts,
+  deleteProduct,
+  getAllOrders,
+  getOrdersByUserId,
+  deleteOrder,
 } from "../modules/admin/adminController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { isAdmin } from "../middlewares/roleMiddleware.js";
@@ -13,8 +18,18 @@ const router = express.Router();
 
 router.post("/register", registerAdmin);
 router.post("/login", loginAdmin);
+
+// --- Admin-Protected Routes ---
+
 router.get("/users", protect, isAdmin, getAllUsers);
 router.delete("/users/:id", protect, isAdmin, deleteUser);
+
+router.get("/products", protect, isAdmin, getAllProducts);
+router.delete("/products/:id", protect, isAdmin, deleteProduct);
+
+router.get("/orders", protect, isAdmin, getAllOrders);
+router.delete("/orders/:id", protect, isAdmin, deleteOrder);
+router.get("/users/:userId/orders", protect, isAdmin, getOrdersByUserId);
 
 router.get("/admins", protect, isAdmin, async (req, res) => {
   try {
