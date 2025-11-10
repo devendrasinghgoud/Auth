@@ -1,22 +1,29 @@
+// models/Category.js
 import mongoose from "mongoose";
 
 const categorySchema = new mongoose.Schema(
   {
-    name: {
+    category: {
       type: String,
       required: [true, "Category name is required"],
       unique: true,
       trim: true,
       maxlength: [100, "Category name cannot exceed 100 characters"],
     },
+    image: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Image",
+      default: null,
+    },
   },
   {
-    timestamps: true, // automatically adds createdAt and updatedAt
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Text index for searching categories by name
-categorySchema.index({ name: "text" });
+categorySchema.index({ category: 1 }, { unique: true });
 
 const Category = mongoose.model("Category", categorySchema);
 export default Category;

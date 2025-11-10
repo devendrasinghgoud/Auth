@@ -6,9 +6,6 @@ import {
   deleteProductService,
 } from "./product.service.js";
 
-// -----------------
-// Create Product
-// -----------------
 export const createProduct = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -33,9 +30,6 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// -----------------
-// Get All Products
-// -----------------
 export const getAllProducts = async (req, res) => {
   try {
     const data = await getAllProductsService(req.query);
@@ -48,9 +42,6 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-// -----------------
-// Get Product by ID
-// -----------------
 export const getProductById = async (req, res) => {
   try {
     const result = await getProductByIdService(req.params.id);
@@ -67,9 +58,6 @@ export const getProductById = async (req, res) => {
   }
 };
 
-// -----------------
-// Update Product
-// -----------------
 export const updateProduct = async (req, res) => {
   try {
     const result = await updateProductService(req.params.id, req.body, req.files);
@@ -87,9 +75,6 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// -----------------
-// Delete Product
-// -----------------
 export const deleteProduct = async (req, res) => {
   try {
     const result = await deleteProductService(req.params.id);

@@ -1,27 +1,12 @@
-// routes/categoryRoutes.js
 import express from "express";
-import {
-  createCategory,
-  getAllCategories,
-  deleteCategory,
-} from "../modules/categorys/categoryController.js";
+import { createCategory, updateCategory, getAllCategories, deleteCategory, upload } from "../modules/categorys/categoryController.js";
 
 const router = express.Router();
 
-// -------------------
-// CRUD routes only
-// -------------------
+router.post("/", upload.single("image"), createCategory);
 
-// Create a new category
-// POST /api/admin/categories
-router.post("/", createCategory);
-
-// Get all categories
-// GET /api/admin/categories
+router.put("/:id", upload.single("image"), updateCategory);
 router.get("/", getAllCategories);
-
-// Delete category by ID
-// DELETE /api/admin/categories/:id
 router.delete("/:id", deleteCategory);
 
 export default router;
