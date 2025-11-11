@@ -2,6 +2,7 @@ import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
+import Logger from "../utils/logger.js";
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-console.log(" Cloudinary Storage Config Loaded");
+Logger.info("Cloudinary Storage Config Loaded");
 
 const storage = new CloudinaryStorage({
   cloudinary,

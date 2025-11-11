@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
 import connectDB from "./config/db.js";
+import Logger from "./utils/logger.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
@@ -15,15 +16,21 @@ import cartRoutes from "./routes/cartRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 
 dotenv.config();
+
 const app = express();
 
 app.use(express.json());
 app.use(cors());
-app.use(morgan("dev"));
+
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+  Logger.info("Morgan logging enabled for development");
+}
 
 connectDB();
 
 app.get("/", (req, res) => {
+  Logger.info("Root route accessed");
   res.send("Auth Backend API is running successfully!");
 });
 
@@ -40,10 +47,8 @@ app.use("/api/admin/categories", categoryRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => console.log(` Server running on port ${PORT}`));
+const PORT = process.env.PORT || 5000;
 
-const PORT = 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  Logger.info(`Server running on port ${PORT}`);
 });

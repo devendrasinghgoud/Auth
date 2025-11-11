@@ -1,7 +1,11 @@
 import Product from "../../models/Product.js";
 import Image from "../../models/imageModel.js";
 import cloudinary from "../../config/cloudinary.js";
+import logger from "../../utils/logger.js";
 
+// ---------------------------
+// Create Product
+// ---------------------------
 export const createProductService = async (user, data, files) => {
   const {
     title,
@@ -21,7 +25,8 @@ export const createProductService = async (user, data, files) => {
     );
   }
 
-  // Upload product images (if any)
+  logger.info("Creating new product", { title, userId: user?._id });
+
   const imageIds = [];
   if (files?.length) {
     for (const file of files) {
@@ -40,10 +45,8 @@ export const createProductService = async (user, data, files) => {
     }
   }
 
-  // Compute discount and price
   const discount = Number(discountPercentage) || 0;
-  const discountedPrice =
-    original_price - (original_price * discount) / 100;
+  const discountedPrice = original_price - (original_price * discount) / 100;
   const quantity = Number(stockQuantity) || 0;
 
   const product = await Product.create({
@@ -56,10 +59,15 @@ export const createProductService = async (user, data, files) => {
     stockQuantity: quantity,
     inStock: quantity > 0,
     brand: brand.trim(),
-    category, //  now stores ObjectId of category
+    category,
     images: imageIds,
     trending: trending ?? false,
     createdBy: user?._id || null,
+  });
+
+  logger.info("Product created successfully", {
+    productId: product._id,
+    title: product.title,
   });
 
   return {
@@ -69,11 +77,16 @@ export const createProductService = async (user, data, files) => {
   };
 };
 
+// ---------------------------
+// Get All Products
+// ---------------------------
 export const getAllProductsService = async (query = {}) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 8;
   const search = query.search?.trim() || "";
   const sortOrder = query.sort === "oldest" ? 1 : -1;
+
+  logger.info("Fetching products", { page, limit, search, sortOrder });
 
   const filter = search
     ? {
@@ -96,27 +109,41 @@ export const getAllProductsService = async (query = {}) => {
     .limit(limit)
     .lean();
 
+  logger.info("Products fetched", {
+    count: results.length,
+    total,
+    totalPages: Math.ceil(total / limit),
+  });
+
   return {
     success: true,
     message: "Products fetched successfully",
     results,
-    
-      count: results.length,
-      total,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      limit,
-    
+    count: results.length,
+    total,
+    totalPages: Math.ceil(total / limit),
+    currentPage: page,
+    limit,
   };
 };
 
+// ---------------------------
+// Get Product By ID
+// ---------------------------
 export const getProductByIdService = async (id) => {
+  logger.info("Fetching product by ID", { productId: id });
+
   const product = await Product.findById(id)
     .populate("category", "category _id")
     .populate("images", "url public_id")
     .populate("createdBy", "name email");
 
-  if (!product) throw new Error("Product not found");
+  if (!product) {
+    logger.warn("Product not found", { productId: id });
+    throw new Error("Product not found");
+  }
+
+  logger.info("Product fetched successfully", { productId: id });
 
   return {
     success: true,
@@ -125,11 +152,19 @@ export const getProductByIdService = async (id) => {
   };
 };
 
+// ---------------------------
+// Update Product
+// ---------------------------
 export const updateProductService = async (id, data, files) => {
-  const product = await Product.findById(id);
-  if (!product) throw new Error("Product not found");
+  logger.info("Updating product", { productId: id });
 
-  const updatableFields = [
+  const product = await Product.findById(id);
+  if (!product) {
+    logger.warn("Product not found for update", { productId: id });
+    throw new Error("Product not found");
+  }
+
+  const fields = [
     "title",
     "description",
     "original_price",
@@ -141,19 +176,16 @@ export const updateProductService = async (id, data, files) => {
     "trending",
   ];
 
-  for (const field of updatableFields) {
+  for (const field of fields) {
     if (data[field] !== undefined) product[field] = data[field];
   }
 
-  // Recalculate price and stock
   const discount = Number(product.discountPercentage) || 0;
   product.price =
     product.original_price - (product.original_price * discount) / 100;
   product.inStock = (product.stockQuantity || 0) > 0;
 
-  // Handle new image uploads
   if (files?.length) {
-    // Delete old images
     if (product.images?.length) {
       for (const imgId of product.images) {
         const imgDoc = await Image.findById(imgId);
@@ -164,7 +196,6 @@ export const updateProductService = async (id, data, files) => {
       }
     }
 
-    // Upload new images
     const newImageIds = [];
     for (const file of files) {
       const upload = await cloudinary.uploader.upload(file.path, {
@@ -186,6 +217,8 @@ export const updateProductService = async (id, data, files) => {
 
   await product.save();
 
+  logger.info("Product updated successfully", { productId: id });
+
   return {
     success: true,
     message: "Product updated successfully",
@@ -193,14 +226,18 @@ export const updateProductService = async (id, data, files) => {
   };
 };
 
-// -----------------
+// ---------------------------
 // Delete Product
-// -----------------
+// ---------------------------
 export const deleteProductService = async (id) => {
-  const product = await Product.findById(id);
-  if (!product) throw new Error("Product not found");
+  logger.info("Deleting product", { productId: id });
 
-  // Delete product images from Cloudinary + DB
+  const product = await Product.findById(id);
+  if (!product) {
+    logger.warn("Product not found for deletion", { productId: id });
+    throw new Error("Product not found");
+  }
+
   if (product.images?.length) {
     for (const imgId of product.images) {
       const imgDoc = await Image.findById(imgId);
@@ -212,6 +249,8 @@ export const deleteProductService = async (id) => {
   }
 
   await product.deleteOne();
+
+  logger.info("Product deleted successfully", { productId: id });
 
   return {
     success: true,

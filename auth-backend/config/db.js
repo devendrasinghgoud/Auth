@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import Logger from "../utils/logger.js";
 
 dotenv.config();
 
@@ -10,11 +11,23 @@ const connectDB = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log(` MongoDB Connected: ${mongoose.connection.name}`);
+    Logger.info(`MongoDB Connected: ${mongoose.connection.name}`);
   } catch (error) {
-    console.error(" MongoDB Connection Error:", error.message);
+    Logger.error("MongoDB Connection Error", { message: error.message, stack: error.stack });
     process.exit(1);
   }
+
+  mongoose.connection.on("disconnected", () => {
+    Logger.warn("MongoDB disconnected");
+  });
+
+  mongoose.connection.on("reconnected", () => {
+    Logger.info("MongoDB reconnected");
+  });
+
+  mongoose.connection.on("error", (err) => {
+    Logger.error("MongoDB connection error", { message: err.message });
+  });
 };
 
 export default connectDB;
