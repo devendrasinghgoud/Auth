@@ -23,7 +23,6 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-categorySchema.index({ category: 1 }, { unique: true });
-
+// removed redundant index — unique already defined above
 const Category = mongoose.model("Category", categorySchema);
 export default Category;

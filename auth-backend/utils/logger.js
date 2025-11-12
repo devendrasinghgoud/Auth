@@ -1,29 +1,46 @@
 import winston from "winston";
+import MongoDBTransport from "./dbTransport.js";
 import path from "path";
 import fs from "fs";
-import MongoDBTransport from "./dbTransport.js";
 
+// Ensure logs folder exists
 const logDir = "logs";
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir);
 }
 
-const { combine, timestamp, printf, colorize } = winston.format;
-
-const logFormat = printf(({ level, message, timestamp }) => {
-  return `[${timestamp}] ${level}: ${message}`;
-});
+// Log format (simple + timestamp)
+const logFormat = winston.format.combine(
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  winston.format.printf(({ timestamp, level, message }) => {
+    return `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+  })
+);
 
 const logger = winston.createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
-  format: combine(colorize(), timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), logFormat),
+  level: "info",
+  format: logFormat,
   transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: path.join(logDir, "error.log"), level: "error" }),
-    new winston.transports.File({ filename: path.join(logDir, "combined.log") }),
+    //  Store only ERROR logs (very small, readable)
+    new winston.transports.File({
+      filename: path.join(logDir, "error.log"),
+      level: "error",
+      maxsize: 100 * 1024, // 100 KB per file
+      maxFiles: 5, // keep only 5 files
+      tailable: true, // keeps the newest logs
+    }),
 
-    // 🧱 Custom MongoDB transport
-    new MongoDBTransport({ level: "error" }), // only log errors in DB
+    //  Store INFO and WARN logs (small size)
+    new winston.transports.File({
+      filename: path.join(logDir, "combined.log"),
+      level: "info",
+      maxsize: 150 * 1024, // 150 KB per file
+      maxFiles: 3,
+      tailable: true,
+    }),
+
+    // 🗄️ Optional: MongoDB Transport (stores only 50 latest errors)
+    new MongoDBTransport(),
   ],
 });
 
